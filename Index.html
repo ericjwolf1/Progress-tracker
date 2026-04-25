@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Practice Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #eeede9;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text-muted: #6b6b66;
+    --text-faint: #a0a09a;
+    --accent: #2d6a4f;
+    --accent-light: #d8f0e4;
+    --accent-text: #1a4731;
+    --danger: #c0392b;
+    --danger-light: #fde8e6;
+    --danger-text: #7a1f16;
+    --warn-light: #fff3e0;
+    --warn-text: #7a4a00;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); font-size: 15px; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; max-width: 480px; margin: 0 auto; }
+
+  /* Header */
+  .header { padding: 18px 18px 0; }
+  .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .header p { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-family: 'DM Mono', monospace; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 6px; padding: 14px 18px 0; }
+  .tab { flex: 1; font-size: 13px; font-family: 'DM Sans', sans-serif; padding: 8px 4px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer; background: transparent; color: var(--text-muted); font-weight: 500; transition: all 0.15s; }
+  .tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  /* Scrollable content */
+  .content { flex: 1; overflow-y: auto; padding: 16px 18px 32px; -webkit-overflow-scrolling: touch; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+
+  /* Form elements */
+  .field { margin-bottom: 12px; }
+  .field label { font-size: 12px; color: var(--text-muted); font-weight: 500; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  input[type=text], input[type=number], input[type=date], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); font-size: 15px; font-family: 'DM Sans', sans-serif;
+    background: var(--surface); color: var(--text); appearance: none; -webkit-appearance: none;
+    outline: none; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Buttons */
+  .btn { width: 100%; padding: 12px; border: none; border-radius: var(--radius-sm); font-size: 15px; font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+  .btn:active { transform: scale(0.98); opacity: 0.85; }
+  .btn-primary { background: var(--text); color: var(--bg); }
+  .btn-sm { font-size: 12px; padding: 5px 10px; width: auto; font-weight: 500; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted); cursor: pointer; }
+  .btn-danger { color: var(--danger); border-color: var(--border); }
+  .btn-danger:active { background: var(--danger-light); }
+
+  /* Messages */
+  .msg { font-size: 13px; min-height: 18px; margin-top: 8px; }
+  .msg.ok { color: var(--accent); }
+  .msg.err { color: var(--danger); }
+
+  /* Metric summary cards */
+  .metrics-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 10px 8px; }
+  .metric-card .mlabel { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+  .metric-card .mval { font-size: 20px; font-weight: 600; margin-top: 2px; letter-spacing: -0.5px; }
+
+  /* Entry rows */
+  .entry { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .entry:last-child { border-bottom: none; }
+  .entry-name { flex: 1; font-weight: 500; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-date { font-size: 11px; color: var(--text-faint); font-family: 'DM Mono', monospace; flex-shrink: 0; }
+  .entry-val { font-size: 14px; font-weight: 600; flex-shrink: 0; min-width: 46px; text-align: right; font-family: 'DM Mono', monospace; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600; flex-shrink: 0; }
+  .badge-ok { background: var(--accent-light); color: var(--accent-text); }
+  .badge-no { background: var(--danger-light); color: var(--danger-text); }
+
+  /* Activity rows */
+  .act-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .act-row:last-child { border-bottom: none; }
+  .act-info { flex: 1; min-width: 0; }
+  .act-info .aname { font-weight: 600; font-size: 14px; }
+  .act-info .ameta { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 32px 0; color: var(--text-faint); font-size: 13px; }
+
+  /* Section title */
+  .stitle { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+  /* Debug/info bar */
+  .infobar { font-size: 11px; color: var(--text-faint); font-family: 'DM Mono', monospace; margin-bottom: 10px; }
+
+  /* Export/import row */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+  .toolbar .btn-sm { flex: 1; text-align: center; padding: 9px 8px; font-size: 13px; }
+
+  /* Chart */
+  #chart-wrapper { position: relative; width: 100%; height: 240px; }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  /* Notes */
+  .notes-tip { font-size: 11px; color: var(--text-faint); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <h1>Practice Tracker</h1>
+    <p>track · measure · improve</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('log')">Log</button>
+    <button class="tab" onclick="showTab('activities')">Activities</button>
+    <button class="tab" onclick="showTab('progress')">Progress</button>
+    <button class="tab" onclick="showTab('data')">Data</button>
+  </div>
+
+  <div class="content">
+
+    <!-- LOG TAB -->
+    <div class="pane active" id="pane-log">
+      <div class="card">
+        <div class="field">
+          <label>Activity</label>
+          <select id="sel-activity"><option value="">Select activity...</option></select>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label id="metric-label-log">Value</label>
+            <input type="number" id="inp-value" placeholder="e.g. 70" step="any" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="inp-date">
+          </div>
+        </div>
+        <div class="field">
+          <label>Notes (optional)</label>
+          <input type="text" id="inp-notes" placeholder="e.g. windy conditions">
+        </div>
+        <button class="btn btn-primary" onclick="logSession()">Log session</button>
+        <div class="msg" id="log-msg"></div>
+      </div>
+
+      <p class="stitle">Recent entries</p>
+      <div class="card" id="entries-list"><div class="empty">No sessions yet.</div></div>
+    </div>
+
+    <!-- ACTIVITIES TAB -->
+    <div class="pane" id="pane-activities">
+      <div class="card">
+        <p class="stitle" style="margin-bottom:12px;">New activity</p>
+        <div class="field">
+          <label>Activity name</label>
+          <input type="text" id="inp-activity" placeholder="e.g. Putting from 3 feet">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Metric label</label>
+            <input type="text" id="inp-metric" placeholder="e.g. % made">
+          </div>
+          <div class="field">
+            <label>Unit</label>
+            <input type="text" id="inp-unit" placeholder="e.g. %">
+          </div>
+        </div>
+        <div class="field">
+          <label>Goal value</label>
+          <input type="number" id="inp-goal" placeholder="e.g. 90" step="any" inputmode="decimal">
+        </div>
+        <button class="btn btn-primary" onclick="addActivity()">Add activity</button>
+        <div class="msg" id="act-msg"></div>
+      </div>
+
+      <p class="stitle">Your activities</p>
+      <div class="card" id="activity-list"><div class="empty">No activities yet.</div></div>
+    </div>
+
+    <!-- PROGRESS TAB -->
+    <div class="pane" id="pane-progress">
+      <div class="field">
+        <label>Activity</label>
+        <select id="sel-filter" onchange="renderProgress()"><option value="">All activities</option></select>
+      </div>
+      <div class="infobar" id="debug-info"></div>
+      <div class="metrics-row" id="summary-cards"></div>
+      <div class="card">
+        <div id="chart-wrapper">
+          <canvas id="progressChart" role="img" aria-label="Line chart of performance over time">No data.</canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA TAB -->
+    <div class="pane" id="pane-data">
+      <div class="card">
+        <p class="stitle" style="margin-bottom:8px;">Backup &amp; restore</p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">Export your data as a JSON file to back it up or transfer between devices. Import to restore.</p>
+        <div class="toolbar">
+          <button class="btn-sm" onclick="exportData()">Export JSON</button>
+          <button class="btn-sm" onclick="document.getElementById('import-file').click()">Import JSON</button>
+        </div>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+        <div class="msg" id="data-msg"></div>
+      </div>
+
+      <div class="card">
+        <p class="stitle" style="margin-bottom:8px;">Storage info</p>
+        <div id="storage-info" style="font-size:13px;color:var(--text-muted);font-family:'DM Mono',monospace;"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="card" style="border-color:var(--danger-light);">
+        <p class="stitle" style="margin-bottom:8px;color:var(--danger);">Danger zone</p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Delete all sessions and activities. This cannot be undone.</p>
+        <button class="btn" style="background:var(--danger-light);color:var(--danger);font-weight:600;" onclick="clearAll()">Clear all data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let activities = [];
+let sessions = [];
+let chartInstance = null;
+
+function loadData() {
+  try {
+    const a = localStorage.getItem('pt_activities');
+    const s = localStorage.getItem('pt_sessions');
+    activities = a ? JSON.parse(a) : [];
+    sessions = s ? JSON.parse(s) : [];
+    activities = activities.map(x => ({ ...x, id: String(x.id) }));
+    sessions = sessions.map(x => ({ ...x, id: String(x.id), activityId: String(x.activityId) }));
+  } catch(e) { activities = []; sessions = []; }
+}
+
+function save() {
+  localStorage.setItem('pt_activities', JSON.stringify(activities));
+  localStorage.setItem('pt_sessions', JSON.stringify(sessions));
+}
+
+loadData();
+
+document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
+
+if (!activities.length) {
+  activities.push({ id: String(Date.now()), name: 'Putting from 3 feet', metric: '% made from 10 putts', unit: '%', goal: 90 });
+  save();
+}
+
+function showTab(t) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-'+t).classList.add('active');
+  document.querySelector(`.tab[onclick="showTab('${t}')"]`).classList.add('active');
+  if (t==='progress') renderProgress();
+  if (t==='log') { renderActivitySelect(); renderEntriesList(); }
+  if (t==='activities') renderActivityList();
+  if (t==='data') renderStorageInfo();
+}
+
+function addActivity() {
+  const name = document.getElementById('inp-activity').value.trim();
+  const metric = document.getElementById('inp-metric').value.trim();
+  const unit = document.getElementById('inp-unit').value.trim();
+  const goal = parseFloat(document.getElementById('inp-goal').value);
+  const msg = document.getElementById('act-msg');
+  if (!name || !metric) { showMsg(msg,'Name and metric are required.','err'); return; }
+  if (activities.find(a=>a.name===name)) { showMsg(msg,'Activity already exists.','err'); return; }
+  activities.push({ id: String(Date.now()), name, metric, unit, goal: isNaN(goal)?null:goal });
+  save();
+  ['inp-activity','inp-metric','inp-unit','inp-goal'].forEach(id=>document.getElementById(id).value='');
+  showMsg(msg,'Activity added!','ok');
+  renderActivityList();
+  renderActivitySelect();
+}
+
+function deleteActivity(id) {
+  if (!confirm('Remove this activity and all its sessions?')) return;
+  activities = activities.filter(a=>a.id!==id);
+  sessions = sessions.filter(s=>s.activityId!==id);
+  save(); renderActivityList(); renderActivitySelect();
+}
+
+function renderActivityList() {
+  const el = document.getElementById('activity-list');
+  if (!activities.length) { el.innerHTML='<div class="empty">No activities yet.</div>'; return; }
+  el.innerHTML = activities.map(a => `
+    <div class="act-row">
+      <div class="act-info">
+        <div class="aname">${esc(a.name)}</div>
+        <div class="ameta">${esc(a.metric)}${a.goal!=null?' · Goal: '+a.goal+(a.unit||''):''}</div>
+      </div>
+      <button class="btn-sm btn-danger" onclick="deleteActivity('${a.id}')">Remove</button>
+    </div>`).join('');
+}
+
+function renderActivitySelect() {
+  const sel = document.getElementById('sel-activity');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select activity...</option>' + activities.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  if (cur) sel.value = cur;
+  sel.onchange = () => {
+    const a = activities.find(x=>x.id===sel.value);
+    document.getElementById('metric-label-log').textContent = a ? a.metric+(a.unit?' ('+a.unit+')':'') : 'Value';
+  };
+}
+
+function logSession() {
+  const actId = String(document.getElementById('sel-activity').value);
+  const val = parseFloat(document.getElementById('inp-value').value);
+  const date = document.getElementById('inp-date').value;
+  const notes = document.getElementById('inp-notes').value.trim();
+  const msg = document.getElementById('log-msg');
+  if (!actId || actId==='') { showMsg(msg,'Select an activity.','err'); return; }
+  if (isNaN(val)) { showMsg(msg,'Enter a value.','err'); return; }
+  if (!date) { showMsg(msg,'Pick a date.','err'); return; }
+  sessions.push({ id: String(Date.now()), activityId: actId, value: val, date, notes });
+  save();
+  document.getElementById('inp-value').value='';
+  document.getElementById('inp-notes').value='';
+  showMsg(msg,'Session logged!','ok');
+  renderEntriesList();
+}
+
+function deleteSession(id) {
+  sessions = sessions.filter(s=>s.id!==id);
+  save();
+  renderEntriesList();
+}
+
+function renderEntriesList() {
+  const el = document.getElementById('entries-list');
+  const recent = [...sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12);
+  if (!recent.length) { el.innerHTML='<div class="empty">No sessions yet.</div>'; return; }
+  el.innerHTML = recent.map(s => {
+    const a = activities.find(x=>x.id===s.activityId);
+    const name = a ? esc(a.name) : '<span style="color:var(--text-faint)">Unknown</span>';
+    const unit = a ? (a.unit||'') : '';
+    const atGoal = a && a.goal!=null && s.value>=a.goal;
+    const badge = a && a.goal!=null ? `<span class="badge ${atGoal?'badge-ok':'badge-no'}">${atGoal?'✓':'·'}</span>` : '';
+    const note = s.notes ? `<span class="notes-tip" title="${esc(s.notes)}">${esc(s.notes)}</span>` : '';
+    return `<div class="entry">
+      <div class="entry-name">${name}</div>
+      <div class="entry-date">${s.date}</div>
+      <div class="entry-val">${s.value}${unit}</div>
+      ${badge}${note}
+      <button class="btn-sm btn-danger" onclick="deleteSession('${s.id}')" style="padding:4px 8px;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderProgress() {
+  loadData();
+  const filterSel = document.getElementById('sel-filter');
+  const prev = filterSel.value;
+  filterSel.innerHTML = '<option value="">All activities</option>' + activities.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  if (prev) filterSel.value = prev;
+
+  const filterId = filterSel.value || null;
+  const filtered = filterId ? sessions.filter(s=>s.activityId===filterId) : sessions;
+  const sorted = [...filtered].sort((a,b)=>a.date.localeCompare(b.date));
+
+  document.getElementById('debug-info').textContent =
+    `${activities.length} activities · ${sessions.length} sessions total · ${filtered.length} shown`;
+
+  const cards = document.getElementById('summary-cards');
+  const wrapper = document.getElementById('chart-wrapper');
+
+  if (!sorted.length) {
+    cards.innerHTML='';
+    wrapper.innerHTML='<div class="empty" style="padding:40px 0;">Log a session first, then come back here.</div>';
+    return;
+  }
+
+  const vals = sorted.map(s=>s.value);
+  const latest = vals[vals.length-1];
+  const best = Math.max(...vals);
+  const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const act = filterId ? activities.find(x=>x.id===filterId) : null;
+  const unit = act ? (act.unit||'') : '';
+  const goalVal = act && act.goal!=null ? act.goal : null;
+
+  const trend = vals.length >= 2 ? vals[vals.length-1] - vals[0] : null;
+  const trendStr = trend !== null ? (trend >= 0 ? '+' : '') + trend.toFixed(1) + unit : '–';
+
+  cards.innerHTML = `
+    <div class="metric-card"><div class="mlabel">Latest</div><div class="mval">${latest.toFixed(1)}<span style="font-size:12px;font-weight:400;color:var(--text-muted)">${unit}</span></div></div>
+    <div class="metric-card"><div class="mlabel">Best</div><div class="mval">${best.toFixed(1)}<span style="font-size:12px;font-weight:400;color:var(--text-muted)">${unit}</span></div></div>
+    <div class="metric-card"><div class="mlabel">Avg</div><div class="mval">${avg.toFixed(1)}<span style="font-size:12px;font-weight:400;color:var(--text-muted)">${unit}</span></div></div>
+  `;
+
+  const labels = sorted.map(s=>s.date);
+  const data = sorted.map(s=>s.value);
+
+  const datasets = [{
+    label: act ? act.metric : 'Performance',
+    data,
+    borderColor: '#2d6a4f',
+    backgroundColor: 'rgba(45,106,79,0.08)',
+    tension: 0.35,
+    fill: true,
+    pointRadius: 5,
+    pointBackgroundColor: '#2d6a4f',
+    pointBorderColor: '#fff',
+    pointBorderWidth: 2
+  }];
+
+  if (goalVal !== null) {
+    datasets.push({
+      label: 'Goal (' + goalVal + unit + ')',
+      data: labels.map(()=>goalVal),
+      borderColor: '#e07b39',
+      borderDash: [5,4],
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false
+    });
+  }
+
+  wrapper.innerHTML = '<canvas id="progressChart" role="img" aria-label="Line chart of performance over time">No data.</canvas>';
+  if (chartInstance) { try { chartInstance.destroy(); } catch(e){} chartInstance = null; }
+
+  setTimeout(() => {
+    const canvas = document.getElementById('progressChart');
+    if (!canvas) return;
+    chartInstance = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'top', labels: { font: { size: 11, family: 'DM Mono' }, boxWidth: 10, padding: 14 } },
+          tooltip: { titleFont: { size: 12 }, bodyFont: { size: 12 } }
+        },
+        scales: {
+          x: { ticks: { font: { size: 10, family: 'DM Mono' }, maxRotation: 45, autoSkip: true }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          y: { ticks: { font: { size: 10, family: 'DM Mono' } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
+      }
+    });
+  }, 50);
+}
+
+function renderStorageInfo() {
+  const el = document.getElementById('storage-info');
+  el.innerHTML = `Activities: ${activities.length}<br>Sessions: ${sessions.length}<br>Storage: localStorage (browser)`;
+}
+
+function exportData() {
+  const payload = { activities, sessions, exportedAt: new Date().toISOString(), version: 1 };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'practice_tracker_backup_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showMsg(document.getElementById('data-msg'), 'Exported successfully!', 'ok');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.activities || !data.sessions) throw new Error('Invalid format');
+      if (!confirm(`Import ${data.activities.length} activities and ${data.sessions.length} sessions? This will replace your current data.`)) return;
+      activities = data.activities.map(x=>({...x, id: String(x.id)}));
+      sessions = data.sessions.map(x=>({...x, id: String(x.id), activityId: String(x.activityId)}));
+      save();
+      showMsg(document.getElementById('data-msg'), 'Imported successfully!', 'ok');
+      renderStorageInfo();
+      renderActivitySelect();
+    } catch(err) {
+      showMsg(document.getElementById('data-msg'), 'Import failed — invalid file.', 'err');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearAll() {
+  if (!confirm('Delete ALL activities and sessions? This cannot be undone.')) return;
+  activities = []; sessions = [];
+  save();
+  showMsg(document.getElementById('data-msg'), 'All data cleared.', 'ok');
+  renderStorageInfo();
+  renderActivitySelect();
+  renderEntriesList();
+}
+
+function showMsg(el, text, type) {
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 3000);
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+renderActivitySelect();
+renderEntriesList();
+</script>
+</body>
+</html>
